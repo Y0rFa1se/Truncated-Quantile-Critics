@@ -14,7 +14,7 @@ network:
   log_alpha: 0.0
 
 training:
-  drop_k: 2
+  drop_k: 10
   kappa: 1.0
   gamma: 0.95
   tau: 0.005

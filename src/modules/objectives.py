@@ -21,7 +21,7 @@ def _get_critic_loss(quantiles, target_quantiles, kappa=1.0):
 
     quantile_weight = torch.abs(tau - (delta < 0).float())
 
-    loss = (quantile_weight * huber_loss).mean()
+    loss = (quantile_weight * huber_loss).sum(dim=2).mean()
 
     return loss
 
@@ -46,7 +46,7 @@ def get_critic_loss(agent, batch):
     with torch.no_grad():
         action_n, log_prob_n = agent(next_state)
         target_quantiles = agent.target_critic(next_state, action_n)
-        target_quantiles -= agent.alpha * log_prob_n.unsqueeze(0)
+        target_quantiles -= agent.alpha.detach() * log_prob_n.unsqueeze(0)
 
         r = reward.view(1, -1, 1)
         d = done.view(1, -1, 1)
@@ -66,7 +66,7 @@ def get_actor_loss(agent, batch):
     action_n, log_prob_n = agent(state)
     quantiles = agent.critic(state, action_n)
 
-    return _get_actor_loss(log_prob_n, quantiles, agent.alpha)
+    return _get_actor_loss(log_prob_n, quantiles, agent.alpha.detach())
 
 
 def get_log_alpha_loss(agent, batch):
