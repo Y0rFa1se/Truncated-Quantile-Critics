@@ -14,11 +14,12 @@ network:
   log_alpha: 0.0
 
 training:
-  drop_k: 10
+  drop_k: 20
   kappa: 1.0
-  gamma: 0.95
+  gamma: 0.99
   tau: 0.005
   target_entropy: null
+  reward_scale: 1.0
 
   policy_lr: 1e-4
   critic_lr: 1e-4
