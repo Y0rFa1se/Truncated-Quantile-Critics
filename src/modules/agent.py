@@ -17,17 +17,29 @@ class Agent(L.LightningModule):
         self.critic_hidden_dim = self.hparams.network.critic_hidden_dim
         self.critic_num = self.hparams.network.critic_num
         self.quantile_num = self.hparams.network.quantile_num
-        self.log_alpha = torch.nn.Parameter(torch.tensor(float(self.hparams.network.log_alpha)))
+        self.log_alpha = torch.nn.Parameter(
+            torch.tensor(float(self.hparams.network.log_alpha))
+        )
         self.alpha = self.log_alpha.exp()
         self.gamma = self.hparams.training.gamma
         self.kappa = self.hparams.training.kappa
 
-        self.actor = PolicyNetwork(self.state_dim, self.action_dim, self.policy_hidden_dim)
+        self.actor = PolicyNetwork(
+            self.state_dim, self.action_dim, self.policy_hidden_dim
+        )
         self.quantiles = QuantileEnsembleNetwork(
-            self.state_dim, self.action_dim, self.critic_hidden_dim, self.critic_num, self.quantile_num
+            self.state_dim,
+            self.action_dim,
+            self.critic_hidden_dim,
+            self.critic_num,
+            self.quantile_num,
         )
         self.target_quantiles = QuantileEnsembleNetwork(
-            self.state_dim, self.action_dim, self.critic_hidden_dim, self.critic_num, self.quantile_num
+            self.state_dim,
+            self.action_dim,
+            self.critic_hidden_dim,
+            self.critic_num,
+            self.quantile_num,
         )
         self.target_quantiles.load_state_dict(self.quantiles.state_dict())
 
@@ -51,11 +63,15 @@ class Agent(L.LightningModule):
         return self.target_quantiles(state, action)
 
     def configure_optimizers(self):
-        actor_opt = torch.optim.Adam(self.actor.parameters(), lr=self.hparams.training.policy_lr)
+        actor_opt = torch.optim.Adam(
+            self.actor.parameters(), lr=self.hparams.training.policy_lr
+        )
         critic_opt = torch.optim.Adam(
             self.quantiles.parameters(), lr=self.hparams.training.critic_lr
         )
-        log_alpha_opt = torch.optim.Adam([self.log_alpha], lr=self.hparams.training.log_alpha_lr)
+        log_alpha_opt = torch.optim.Adam(
+            [self.log_alpha], lr=self.hparams.training.log_alpha_lr
+        )
 
         return [actor_opt, critic_opt, log_alpha_opt]
 
@@ -65,11 +81,13 @@ class Agent(L.LightningModule):
         critic_loss = get_critic_loss(self, batch)
         critic_opt.zero_grad()
         self.manual_backward(critic_loss)
+        torch.nn.utils.clip_grad_norm_(self.quantiles.parameters(), max_norm=1.0)
         critic_opt.step()
 
         actor_loss = get_actor_loss(self, batch)
         actor_opt.zero_grad()
         self.manual_backward(actor_loss)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
         actor_opt.step()
 
         log_alpha_loss = get_log_alpha_loss(self, batch)

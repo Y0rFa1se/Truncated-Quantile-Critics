@@ -2,21 +2,26 @@ import torch
 
 
 def _get_critic_loss(quantiles, target_quantiles, kappa=1.0):
-    M = quantiles.shape[-1]
-    tau = torch.arange(0.5, M, 1.0, device=quantiles.device) / M
-    tau = tau.view(1, 1, 1, -1)
-    theta = quantiles.unsqueeze(2)
+    N_critics, batch_size, M = quantiles.shape
+    N_truncated = target_quantiles.shape[-1]
 
-    target_theta = target_quantiles.unsqueeze(0).unsqueeze(-1)
+    theta = quantiles.transpose(0, 1).reshape(batch_size, -1, 1)
+
+    target_theta = target_quantiles.view(batch_size, 1, N_truncated)
+
+    tau = torch.arange(0.5, M, 1.0, device=quantiles.device) / M
+    tau = tau.view(1, 1, M).repeat(1, N_critics, 1).view(1, -1, 1)
+
     delta = target_theta - theta
     delta_abs = delta.abs()
 
     huber_loss = torch.where(
         delta_abs <= kappa, 0.5 * delta.pow(2), kappa * (delta_abs - 0.5 * kappa)
     )
+
     quantile_weight = torch.abs(tau - (delta < 0).float())
 
-    loss = (quantile_weight * huber_loss / kappa).sum(dim=2).mean()
+    loss = (quantile_weight * huber_loss).mean()
 
     return loss
 
@@ -42,10 +47,10 @@ def get_critic_loss(agent, batch):
         action_n, log_prob_n = agent(next_state)
         target_quantiles = agent.target_critic(next_state, action_n)
         target_quantiles -= agent.alpha * log_prob_n.unsqueeze(0)
-        
+
         r = reward.view(1, -1, 1)
         d = done.view(1, -1, 1)
-        
+
         target_quantiles = r + agent.gamma * (1 - d) * target_quantiles
 
         target_quantiles = target_quantiles.transpose(0, 1).flatten(1)
